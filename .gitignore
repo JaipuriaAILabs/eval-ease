@@ -1,0 +1,4 @@
+*.md
+/responses/
+/src/__pycache__/
+*.env
