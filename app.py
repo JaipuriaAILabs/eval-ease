@@ -115,7 +115,7 @@ with tabs[0]:
         st.markdown("### 👥 Current Students")
         if st.session_state.students:
             for i, student in enumerate(st.session_state.students):
-                st.success(f"{student.name} ({student.roll_number})")
+                st.success(f"Roll Number: {student.roll_number}")
         else:
             st.info("No students added yet. Upload PDFs and add student details.")
 
@@ -125,22 +125,18 @@ with tabs[0]:
 
         for i, file in enumerate(uploaded_files):
             with st.expander(f"Student {i+1}: {file.name}", expanded=i>=len(st.session_state.students)):
-                col1, col2 = st.columns(2)
-                with col1:
-                    name = st.text_input(f"Full Name", key=f"name_{i}")
-                with col2:
-                    roll = st.text_input(f"Roll Number/ID", key=f"roll_{i}")
+                roll = st.text_input(f"Roll Number/ID", key=f"roll_{i}")
 
                 if st.button(f"Save Student {i+1}", key=f"save_{i}", use_container_width=True):
                     already_added = any(s.pdf_filename == file.name and s.roll_number == roll for s in st.session_state.students)
-                    if not already_added and name and roll:
+                    if not already_added and roll:
                         pdf_bytes = file.read()  # Read the PDF file as bytes
                         file.seek(0)  # Reset file pointer for future use if needed
-                        student = Student(name=name, roll_number=roll, pdf_filename=file.name, pdf_bytes=pdf_bytes)
+                        student = Student(name=f"Student-{roll}", roll_number=roll, pdf_filename=file.name, pdf_bytes=pdf_bytes)
                         st.session_state.students.append(student)
-                        st.success(f"✅ Student {name} added successfully!")
-                    elif not name or not roll:
-                        st.error("Please enter both name and roll number.")
+                        st.success(f"✅ Student with Roll Number {roll} added successfully!")
+                    elif not roll:
+                        st.error("Please enter roll number.")
                     else:
                         st.warning(f"Student with file {file.name} and roll {roll} already added.")
 
@@ -278,21 +274,46 @@ with tabs[2]:
         st.markdown(f"**Number of questions:** {len(st.session_state.questions_dict)}")
         st.markdown(f"**Number of rubric criteria:** {len(st.session_state.criteria_list)}")
 
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            if st.button("Run AI Evaluation", use_container_width=True):
-                st.session_state.results = []
-                st.session_state.evaluation_in_progress = True
+        # Student list with individual evaluation buttons
+        st.subheader("Students List")
+
+        # Create a button to evaluate all students
+        if st.button("Run AI Evaluation for All Students", use_container_width=True):
+            st.session_state.results = []
+            st.session_state.evaluation_in_progress = True
+            st.session_state.evaluate_single = False
+            st.session_state.selected_student_idx = None
+
+        # Show all students with individual evaluation buttons
+        for idx, student in enumerate(st.session_state.students):
+            col1, col2, col3 = st.columns([3, 3, 2])
+            with col1:
+                st.markdown(f"**Roll Number: {student.roll_number}**")
+            with col2:
+                st.markdown(f"*File: {student.pdf_filename}*")
+            with col3:
+                if st.button(f"Evaluate", key=f"eval_btn_{idx}", use_container_width=True):
+                    st.session_state.results = [r for r in st.session_state.results if r.student.roll_number != student.roll_number]
+                    st.session_state.evaluation_in_progress = True
+                    st.session_state.selected_student_idx = idx
+                    st.session_state.evaluate_single = True
+            st.markdown("---")
 
         if 'evaluation_in_progress' in st.session_state and st.session_state.evaluation_in_progress:
             with st.spinner("AI Evaluation in progress... This may take a few minutes."):
                 result_placeholders = []
-                for student in st.session_state.students:
+
+                if st.session_state.get('evaluate_single', False) and st.session_state.get('selected_student_idx') is not None:
+                    students_to_evaluate = [st.session_state.students[st.session_state.selected_student_idx]]
+                else:
+                    students_to_evaluate = st.session_state.students
+
+                for _ in students_to_evaluate:
                     result_placeholders.append(st.empty())
 
-                for idx, student in enumerate(st.session_state.students):
+                for idx, student in enumerate(students_to_evaluate):
                     with result_placeholders[idx].container():
-                        st.info(f"Processing {student.name} ({student.roll_number})... Please wait.")
+                        st.info(f"Processing Roll Number: {student.roll_number}... Please wait.")
 
                     try:
                         result_json = evaluate_with_gemini(
@@ -325,7 +346,7 @@ with tabs[2]:
 
                         # Update the placeholder with the results
                         with result_placeholders[idx].container():
-                            st.success(f"✅ Evaluation complete for {student.name}")
+                            st.success(f"✅ Evaluation complete for Roll Number: {student.roll_number}")
 
                             # Create a result table
                             result_data = []
@@ -344,7 +365,7 @@ with tabs[2]:
 
                     except Exception as e:
                         with result_placeholders[idx].container():
-                            st.error(f"❌ Error evaluating {student.name}: {str(e)}")
+                            st.error(f"❌ Error evaluating Roll Number {student.roll_number}: {str(e)}")
                             import traceback
                             st.error(traceback.format_exc())
 
@@ -394,14 +415,14 @@ with tabs[3]:
         if view_type == "Individual Student":
             # Individual student view (original functionality)
             # Allow user to select which student to view
-            student_names = [f"{r.student.name} ({r.student.roll_number})" for r in st.session_state.results]
+            student_names = [f"Roll Number: {r.student.roll_number}" for r in st.session_state.results]
             selected_student = st.selectbox("Select a student to view results:", student_names)
 
             if selected_student:
                 selected_idx = student_names.index(selected_student)
                 result = st.session_state.results[selected_idx]
 
-                st.markdown(f"### Results for {result.student.name}")
+                st.markdown(f"### Results for Roll Number: {result.student.roll_number}")
                 st.markdown(f"**Overall Feedback:** {result.overall_feedback}")
 
                 # Create table of questions, scores, and feedback
@@ -437,7 +458,7 @@ with tabs[3]:
         else:
             # All students view (new functionality)
             for i, result in enumerate(st.session_state.results):
-                with st.expander(f"{result.student.name} ({result.student.roll_number})", expanded=i==0):
+                with st.expander(f"Roll Number: {result.student.roll_number}", expanded=i==0):
                     st.markdown(f"**Overall Feedback:** {result.overall_feedback}")
 
                     # Create table of questions, scores, and feedback

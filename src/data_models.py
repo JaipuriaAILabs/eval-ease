@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
+from pydantic import BaseModel
 
 @dataclass
 class Student:
@@ -117,3 +118,27 @@ class EvaluationResult:
     feedback: Dict[str, str]
     overall_feedback: str = ""
     raw_response: Dict[str, Any] = field(default_factory=dict)  # To store the raw structured output from Gemini
+
+class PydanticQuestionEvaluation(BaseModel):
+    """
+    Pydantic model for individual question evaluation results from Gemini API.
+
+    Attributes:
+        question_id (str): The ID of the question (e.g., "Q1", "Q2").
+        score (float): Numerical score assigned to the answer, typically 0-10.
+        feedback (str): Detailed feedback on the student's answer.
+    """
+    question_id: str
+    score: float
+    feedback: str
+
+class PydanticEvaluationResponse(BaseModel):
+    """
+    Pydantic model for complete evaluation response from Gemini API.
+
+    Attributes:
+        question_evaluations (List[PydanticQuestionEvaluation]): List of question evaluation results.
+        overall_feedback (str): Overall feedback on the student's submission.
+    """
+    question_evaluations: List[PydanticQuestionEvaluation]
+    overall_feedback: str
