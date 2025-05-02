@@ -20,12 +20,12 @@ def format_output_for_csv(results: List[EvaluationResult]) -> List[Dict[str, Any
     for result in results:
         # Calculate average score
         scores = list(result.scores.values())
-        avg_score = sum(scores) / len(scores) if scores else 0
-        avg_score = round(avg_score, 2)  # Round to 2 decimal places
+        sum_score = sum(scores) if scores else 0
+        sum_score = round(sum_score, 2)  # Round to 2 decimal places
 
         row = {
             'Roll Number': result.student.roll_number,
-            'Average Score': avg_score,
+            'Total Score': sum_score,
             'Overall Feedback': result.overall_feedback
         }
         formatted_data.append(row)
